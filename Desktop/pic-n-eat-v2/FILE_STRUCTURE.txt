@@ -1,0 +1,16 @@
+.
+./backend
+./backend/app
+./backend/app/api
+./backend/app/api/routes
+./backend/app/core
+./backend/app/db
+./backend/app/models
+./backend/app/services
+./backend/app/{api
+./backend/app/{api/routes,core,models,services,ml,db}
+./backend/tests
+./ml-pipeline
+./ml-pipeline/scripts
+./ml-pipeline/{data,models,scripts,configs}
+./{backend,frontend,ml-pipeline,infrastructure}
