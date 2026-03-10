@@ -100,3 +100,6 @@ tmp/
 
 # Node modules (if using Railway CLI)
 node_modules/
+
+# Web app build output
+dist/

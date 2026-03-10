@@ -1,0 +1,134 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader, random_split
+from pathlib import Path
+import os
+import shutil
+
+# ---------------------------
+# 1. Download Data from GitHub
+# ---------------------------
+repo_url = "https://github.com/mahekparvez/v3picneat.git"
+data_dir = Path("v3picneat")
+
+# If folder exists, remove it to ensure a fresh download
+if data_dir.exists():
+    shutil.rmtree(data_dir)
+
+print("Downloading data from GitHub...")
+os.system(f"git clone {repo_url}")
+
+# Define the subfolder where the images actually reside in your repo
+# Based on your link, images are in the root of the repo under category folders
+target_path = data_dir 
+
+# ---------------------------
+# 2. Device
+# ---------------------------
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# ---------------------------
+# 3. Image transforms
+# ---------------------------
+transform = transforms.Compose([
+    transforms.Resize((128, 128)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+])
+
+# ---------------------------
+# 4. Dataset & Split (80 Train / 20 Test per class)
+# ---------------------------
+# Load the full dataset
+full_dataset = datasets.ImageFolder(root=target_path, transform=transform)
+
+# Logic for 80/20 split
+# Total images = 300 (100 per category). Train = 240, Test = 60.
+train_size = 240
+test_size = len(full_dataset) - train_size
+
+train_dataset, test_dataset = random_split(full_dataset, [train_size, test_size])
+
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+
+class_names = full_dataset.classes
+print(f"Classes found: {class_names}")
+print(f"Training images: {len(train_dataset)}, Testing images: {len(test_dataset)}")
+
+# ---------------------------
+# 5. CNN Model
+# ---------------------------
+class FoodCNN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(3, 16, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(16, 32, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(32, 64, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2)
+        )
+        self.classifier = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(64 * 16 * 16, 128),
+            nn.ReLU(),
+            nn.Linear(128, 3) 
+        )
+
+    def forward(self, x):
+        return self.classifier(self.features(x))
+
+model = FoodCNN().to(device)
+
+# ---------------------------
+# 6. Loss & Optimizer
+# ---------------------------
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+# ---------------------------
+# 7. Training Loop
+# ---------------------------
+epochs = 10
+for epoch in range(epochs):
+    model.train()
+    running_loss, correct, total = 0, 0, 0
+
+    for images, labels in train_loader:
+        images, labels = images.to(device), labels.to(device)
+        optimizer.zero_grad()
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        running_loss += loss.item()
+        _, preds = torch.max(outputs, 1)
+        correct += (preds == labels).sum().item()
+        total += labels.size(0)
+
+    # Simple Validation check after each epoch
+    model.eval()
+    val_correct = 0
+    with torch.no_grad():
+        for images, labels in test_loader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
+            _, preds = torch.max(outputs, 1)
+            val_correct += (preds == labels).sum().item()
+
+    print(f"Epoch [{epoch+1}/{epochs}] | Loss: {running_loss/len(train_loader):.3f} | "
+          f"Train Acc: {100*correct/total:.2f}% | Test Acc: {100*val_correct/len(test_dataset):.2f}%")
+
+# ---------------------------
+# 8. Save model
+# ---------------------------
+torch.save(model.state_dict(), "food_classifier.pth")
+print("Model saved as food_classifier.pth")

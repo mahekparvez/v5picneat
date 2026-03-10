@@ -1,0 +1,41 @@
+This is a full-stack mobile app called Pic-n-Eat. The codebase is already loaded in this Repl from my GitHub repo: https://github.com/mahekparvez/pic-n-eat-full
+
+Project structure:
+- Frontend: React app using Vite + TypeScript + Tailwind, located in the /mobile folder (src/ inside it contains pages, components, routes, etc.)
+- Backend: Python Flask API in /backend folder — DO NOT TOUCH OR CHANGE ANYTHING IN /backend AT ALL
+- Supabase is used for auth and database
+- There are roughly 4 main pages/screens in the mobile app
+
+Task:
+I only want to replace TWO frontend pages:
+1. The Home page/screen
+2. The Search page/screen
+
+Leave every other page, component, route, navigation, backend, API calls, Supabase integration, and all other code completely unchanged.
+
+Steps:
+1. First, identify the exact files for the current Home and Search pages (likely something like src/pages/Home.tsx, src/screens/Home.tsx, src/views/Home.tsx, or similar — search the codebase to confirm).
+2. Replace the entire content of the Home page file with this new code: 
+
+[PASTE YOUR FULL NEW HOME PAGE CODE HERE — the complete component/file]
+
+3. Replace the entire content of the Search page file with this new code:
+
+[PASTE YOUR FULL NEW SEARCH PAGE CODE HERE — the complete component/file]
+
+4. Ensure:
+   - Routing and navigation still work (e.g., tabs, links from Home to Search and vice versa)
+   - Any data fetching calls to the backend or Supabase continue to work exactly as before
+   - Styles (Tailwind classes) integrate properly with the rest of the app
+   - No new dependencies are added unless absolutely required (and ask me first)
+   - The app still builds and runs without errors
+
+5. After making the changes, run the app and test that:
+   - Home page displays the new UI
+   - Search page displays the new UI
+   - Navigation between pages works
+   - Backend API endpoints are still reachable
+
+If anything breaks, fix it automatically and explain what you fixed.
+
+Only modify the Home and Search page files (and any minor related imports if strictly necessary). Do not touch any other files.
