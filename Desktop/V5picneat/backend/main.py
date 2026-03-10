@@ -32,11 +32,27 @@ DINING_HALLS = {
     "Windsor":      {"lat": 40.4267, "lng": -86.9092},
 }
 
-# Keyword sets for vitamin/mineral classification
-VITAMIN_KEYWORDS = {
-    "spinach", "kale", "broccoli", "carrot", "pepper", "tomato", "sweet potato",
-    "orange", "strawberr", "blueberr", "mango", "cantaloupe", "papaya",
-    "pumpkin", "butternut", "edamame", "pea", "asparagus", "zucchini",
+# Keyword sets for individual vitamin classification
+VIT_A_KEYWORDS = {
+    "carrot", "sweet potato", "butternut", "pumpkin", "cantaloupe", "mango",
+    "spinach", "kale", "papaya", "apricot", "liver",
+}
+VIT_C_KEYWORDS = {
+    "orange", "strawberr", "blueberr", "pepper", "broccoli", "tomato",
+    "papaya", "kale", "spinach", "asparagus", "zucchini", "lemon", "lime",
+    "grapefruit", "kiwi", "pineapple",
+}
+VIT_D_KEYWORDS = {
+    "salmon", "tuna", "sardine", "anchovy", "mackerel", "mushroom",
+    "milk", "yogurt", "cheese", "egg",
+}
+VIT_B_KEYWORDS = {
+    "whole grain", "quinoa", "oat", "lentil", "bean", "chickpea",
+    "brown rice", "edamame", "pea", "sunflower", "avocado", "banana",
+}
+VIT_B12_KEYWORDS = {
+    "beef", "chicken liver", "salmon", "tuna", "sardine", "anchovy",
+    "milk", "yogurt", "cheese", "egg", "clam", "trout",
 }
 MINERAL_KEYWORDS = {
     "milk", "yogurt", "cheese", "tofu", "salmon", "tuna", "sardine", "anchovy",
@@ -57,8 +73,16 @@ def _categorise(item: Dict) -> List[str]:
         cats.append("Fats")
     if carbs >= 30:
         cats.append("Carbs")
-    if any(kw in name_l for kw in VITAMIN_KEYWORDS):
-        cats.append("Vitamins")
+    if any(kw in name_l for kw in VIT_A_KEYWORDS):
+        cats.append("Vitamin A")
+    if any(kw in name_l for kw in VIT_C_KEYWORDS):
+        cats.append("Vitamin C")
+    if any(kw in name_l for kw in VIT_D_KEYWORDS):
+        cats.append("Vitamin D")
+    if any(kw in name_l for kw in VIT_B_KEYWORDS):
+        cats.append("Vitamin B")
+    if any(kw in name_l for kw in VIT_B12_KEYWORDS):
+        cats.append("Vitamin B12")
     if any(kw in name_l for kw in MINERAL_KEYWORDS):
         cats.append("Minerals")
     if not cats:

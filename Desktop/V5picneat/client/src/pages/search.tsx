@@ -36,11 +36,15 @@ interface MenuResponse {
 
 // ── Category config ────────────────────────────────────────────────────────────
 const CATEGORIES = [
-  { name: "Protein",  color: "bg-blue-100   text-blue-700   border-blue-200",   icon: "🍗" },
-  { name: "Carbs",    color: "bg-orange-100 text-orange-700 border-orange-200", icon: "🌾" },
-  { name: "Vitamins", color: "bg-purple-100 text-purple-700 border-purple-200", icon: "🥦" },
-  { name: "Minerals", color: "bg-green-100  text-green-700  border-green-200",  icon: "🥛" },
-  { name: "Fats",     color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: "🔥" },
+  { name: "Protein",    color: "bg-blue-100   text-blue-700   border-blue-200",   icon: "🍗" },
+  { name: "Carbs",      color: "bg-orange-100 text-orange-700 border-orange-200", icon: "🌾" },
+  { name: "Fats",       color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: "🔥" },
+  { name: "Minerals",   color: "bg-green-100  text-green-700  border-green-200",  icon: "🥛" },
+  { name: "Vitamin A",  color: "bg-red-100    text-red-700    border-red-200",    icon: "🥕" },
+  { name: "Vitamin C",  color: "bg-orange-100 text-orange-600 border-orange-200", icon: "🍊" },
+  { name: "Vitamin D",  color: "bg-yellow-100 text-yellow-600 border-yellow-200", icon: "☀️" },
+  { name: "Vitamin B",  color: "bg-purple-100 text-purple-700 border-purple-200", icon: "🌾" },
+  { name: "Vitamin B12",color: "bg-pink-100   text-pink-700   border-pink-200",   icon: "🥩" },
 ];
 
 // ── Meal period helper ─────────────────────────────────────────────────────────
@@ -67,10 +71,10 @@ function itemMatchesPeriod(item: MenuItem, period: MealPeriod): boolean {
 // ── Nutrient value label for selected category ─────────────────────────────────
 function nutrientLabel(item: MenuItem, category: string | null): string {
   switch (category) {
-    case "Protein": return `${item.protein}g protein`;
-    case "Carbs":   return `${item.carbs}g carbs`;
-    case "Fats":    return `${item.fats}g fat`;
-    default:        return item.serving ? `${item.serving}` : "—";
+    case "Protein": return `${item.protein}g / serving`;
+    case "Carbs":   return `${item.carbs}g / serving`;
+    case "Fats":    return `${item.fats}g / serving`;
+    default:        return item.serving ? `${item.serving} / serving` : "— / serving";
   }
 }
 
@@ -158,16 +162,17 @@ export default function SearchPage() {
 
         {/* Header — all text starts at the same left edge */}
         <div className="mb-5">
-          <h1 className="text-[32px] font-bold text-gray-900 leading-tight tracking-tight mb-1">
+          <h1 className="text-[32px] font-bold text-gray-900 leading-tight tracking-tight mb-0.5">
             Find Nutrient-Rich Foods
           </h1>
-          <div className="flex items-center gap-2">
-            <p className="text-[17px] text-gray-500 font-medium">
-              {mealLabel(mealPeriod)} · {mealPeriod !== "All" ? `${mealPeriod} now` : "showing all meals"}
-            </p>
+          <div className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap">
+            <span className="text-[14px] text-gray-500 font-medium truncate">
+              {mealLabel(mealPeriod)}{menuDate ? ` · ${menuDate}` : ""}
+            </span>
+            <span className="text-gray-300 shrink-0">·</span>
             {userPos ? (
-              <span className="flex items-center gap-1 text-[13px] text-green-600 font-semibold">
-                <MapPin size={13} /> Near you
+              <span className="flex items-center gap-0.5 text-[13px] text-green-600 font-semibold shrink-0">
+                <MapPin size={12} /> Near you
               </span>
             ) : (
               <button
@@ -177,17 +182,12 @@ export default function SearchPage() {
                     () => {}
                   )
                 }
-                className="flex items-center gap-1 text-[13px] text-orange-500 font-semibold underline underline-offset-2"
+                className="flex items-center gap-0.5 text-[13px] text-orange-500 font-semibold underline underline-offset-2 shrink-0"
               >
-                <MapPin size={13} /> Enable location
+                <MapPin size={12} /> Enable location
               </button>
             )}
           </div>
-          {menuDate && (
-            <p className="text-[12px] text-gray-400 font-medium mt-0.5 uppercase tracking-tight">
-              {menuDate}
-            </p>
-          )}
         </div>
 
         {/* Category chips */}
