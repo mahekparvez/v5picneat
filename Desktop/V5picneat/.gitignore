@@ -1,0 +1,102 @@
+# Railway
+.railway/
+
+# Env files with secrets (keep .env.example in repo as a template)
+.env
+.env.local
+.env.*.local
+!backend/.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+ENV/
+env/
+.venv
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Xcode
+## Build generated
+build/
+DerivedData/
+## Various settings
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+## Obj-C/Swift specific
+*.hmap
+## App packaging
+*.ipa
+*.dSYM.zip
+*.dSYM
+## Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+# Swift Package Manager
+.build/
+Packages/
+Package.pins
+Package.resolved
+*.xcodeproj
+## CocoaPods
+Pods/
+*.xcworkspace
+!default.xcworkspace
+
+# VS Code
+.vscode/
+
+# JetBrains IDEs
+.idea/
+
+# Railway
+.railway/
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Temporary files
+*~
+*.swp
+*.swo
+.tmp/
+tmp/
+
+# Node modules (if using Railway CLI)
+node_modules/
