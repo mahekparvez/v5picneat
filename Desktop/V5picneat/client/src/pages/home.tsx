@@ -148,7 +148,7 @@ export default function Home() {
                     </div>
                     <p className="text-[14px] font-bold text-gray-500 uppercase tracking-tight">{meal.calories} Cals</p>
                     <div className="flex gap-3 text-[14px] text-gray-400 font-bold uppercase mt-1 items-center">
-                      <span className="flex items-center gap-1"><span className="rotate-45">🍗</span> {meal.protein}g</span>
+                      <span className="flex items-center gap-1"><span className="rotate-180 inline-block">🍗</span> {meal.protein}g</span>
                       <span className="flex items-center gap-1">🌾 {meal.carbs}g</span>
                       <span className="flex items-center gap-1">🔥 {meal.fats}g</span>
                     </div>

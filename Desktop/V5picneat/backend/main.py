@@ -5,17 +5,158 @@ Complete production-ready implementation
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 import httpx
 import base64
 from PIL import Image
 import io
 import json
 import os
+import re
+from datetime import datetime, date
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import time
+
+# ── Dining menu cache ──────────────────────────────────────────────────────────
+_menu_cache: Dict[str, Any] = {"date": None, "data": None}
+
+# Purdue dining hall coordinates (lat, lng) for distance calc
+DINING_HALLS = {
+    "Wiley":        {"lat": 40.4275, "lng": -86.9148},
+    "Earhart":      {"lat": 40.4210, "lng": -86.9242},
+    "Ford":         {"lat": 40.4240, "lng": -86.9183},
+    "Hillenbrand":  {"lat": 40.4215, "lng": -86.9258},
+    "Windsor":      {"lat": 40.4267, "lng": -86.9092},
+}
+
+# Keyword sets for vitamin/mineral classification
+VITAMIN_KEYWORDS = {
+    "spinach", "kale", "broccoli", "carrot", "pepper", "tomato", "sweet potato",
+    "orange", "strawberr", "blueberr", "mango", "cantaloupe", "papaya",
+    "pumpkin", "butternut", "edamame", "pea", "asparagus", "zucchini",
+}
+MINERAL_KEYWORDS = {
+    "milk", "yogurt", "cheese", "tofu", "salmon", "tuna", "sardine", "anchovy",
+    "almond", "cashew", "peanut", "walnut", "seed", "lentil", "bean", "chickpea",
+    "quinoa", "oat", "whole grain", "brown rice", "beef", "chicken liver",
+}
+
+def _categorise(item: Dict) -> List[str]:
+    """Return nutrition category tags for a menu item."""
+    cats = []
+    name_l = item.get("item_name", "").lower()
+    protein = float(item.get("protein", 0) or 0)
+    fat     = float(item.get("fats", 0) or 0)
+    carbs   = float(item.get("carbs", 0) or 0)
+    if protein >= 10:
+        cats.append("Protein")
+    if fat >= 10:
+        cats.append("Fats")
+    if carbs >= 30:
+        cats.append("Carbs")
+    if any(kw in name_l for kw in VITAMIN_KEYWORDS):
+        cats.append("Vitamins")
+    if any(kw in name_l for kw in MINERAL_KEYWORDS):
+        cats.append("Minerals")
+    if not cats:
+        cats.append("Carbs")          # default bucket
+    return cats
+
+
+async def _fetch_purdue_menu_excel() -> List[Dict]:
+    """
+    Download today's Purdue dining menu from the official Excel export.
+    Falls back to Supabase purdue_menu_v2 if the fetch fails.
+    """
+    today = date.today().strftime("%Y-%m-%d")
+    # Purdue Dining publishes a per-day Excel at this endpoint:
+    excel_url = f"https://www.dining.purdue.edu/menus/GetMenuExport.aspx?dtdate={today}"
+    items: List[Dict] = []
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            resp = await client.get(excel_url, headers={"User-Agent": "PicNEat/5.0"})
+            if resp.status_code == 200 and len(resp.content) > 512:
+                import openpyxl
+                wb = openpyxl.load_workbook(io.BytesIO(resp.content), data_only=True)
+                ws = wb.active
+                headers = [str(c.value).strip().lower() if c.value else "" for c in next(ws.iter_rows())]
+
+                def _col(h: str) -> int:
+                    """Return 0-based column index matching a header substring."""
+                    for i, hdr in enumerate(headers):
+                        if h in hdr:
+                            return i
+                    return -1
+
+                col_hall    = _col("dining")
+                col_name    = _col("item") if _col("item") >= 0 else _col("menu item")
+                col_cal     = _col("calorie")
+                col_protein = _col("protein")
+                col_carbs   = _col("carbohydrate") if _col("carbohydrate") >= 0 else _col("carbs")
+                col_fat     = _col("fat")
+                col_meal    = _col("meal")
+                col_station = _col("station")
+                col_serving = _col("serving")
+
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    if not row or not row[col_name if col_name >= 0 else 1]:
+                        continue
+                    def _v(idx):
+                        return row[idx] if idx >= 0 and idx < len(row) else None
+
+                    raw_name = str(_v(col_name) or "").strip()
+                    if not raw_name:
+                        continue
+
+                    hall = str(_v(col_hall) or "Unknown").strip()
+                    # Normalise hall name to our 5 courts
+                    for key in DINING_HALLS:
+                        if key.lower() in hall.lower():
+                            hall = key
+                            break
+
+                    item = {
+                        "item_name":    raw_name,
+                        "dining_hall":  hall,
+                        "meal":         str(_v(col_meal) or "").strip(),
+                        "station":      str(_v(col_station) or "").strip(),
+                        "serving_size": str(_v(col_serving) or "").strip(),
+                        "calories":     float(_v(col_cal) or 0),
+                        "protein":      float(_v(col_protein) or 0),
+                        "carbs":        float(_v(col_carbs) or 0),
+                        "fats":         float(_v(col_fat) or 0),
+                    }
+                    item["categories"] = _categorise(item)
+                    items.append(item)
+
+                print(f"✅ Fetched {len(items)} items from Purdue dining Excel ({today})")
+                return items
+    except Exception as e:
+        print(f"⚠️  Excel fetch failed ({e}), falling back to Supabase")
+
+    # ── Fallback: Supabase purdue_menu_v2 ─────────────────────────────────────
+    try:
+        resp = supabase.table("purdue_menu_v2").select("*").execute()
+        for row in resp.data:
+            row["categories"] = _categorise(row)
+            items.append(row)
+        print(f"✅ Loaded {len(items)} items from Supabase fallback")
+    except Exception as e:
+        print(f"❌ Supabase fallback failed: {e}")
+    return items
+
+
+async def _get_menu() -> List[Dict]:
+    """Return cached menu, refreshing once per calendar day."""
+    today_str = date.today().isoformat()
+    if _menu_cache["date"] != today_str or not _menu_cache["data"]:
+        _menu_cache["data"] = await _fetch_purdue_menu_excel()
+        _menu_cache["date"] = today_str
+    return _menu_cache["data"]  # type: ignore
 
 # Load environment variables
 load_dotenv()
@@ -644,6 +785,62 @@ async def analyze_meal(file: UploadFile = File(...)):
         analysis_time_ms=analysis_time,
         warnings=warnings  # Include validation warnings
     )
+
+@app.get("/dining-menu")
+async def dining_menu(category: Optional[str] = None, hall: Optional[str] = None):
+    """
+    Return today's Purdue dining menu grouped by dining hall.
+    Optional query params:
+      ?category=Protein|Carbs|Fats|Vitamins|Minerals
+      ?hall=Wiley|Earhart|Ford|Hillenbrand|Windsor
+    """
+    items = await _get_menu()
+
+    # Optional filters
+    if category:
+        items = [i for i in items if category in i.get("categories", [])]
+    if hall:
+        items = [i for i in items if hall.lower() in i.get("dining_hall", "").lower()]
+
+    # Group by dining hall
+    grouped: Dict[str, List[Dict]] = {}
+    for item in items:
+        h = item.get("dining_hall", "Unknown")
+        grouped.setdefault(h, [])
+        grouped[h].append({
+            "name":       item.get("item_name", ""),
+            "meal":       item.get("meal", ""),
+            "station":    item.get("station", ""),
+            "serving":    item.get("serving_size", ""),
+            "calories":   item.get("calories", 0),
+            "protein":    item.get("protein", 0),
+            "carbs":      item.get("carbs", 0),
+            "fats":       item.get("fats", 0),
+            "categories": item.get("categories", []),
+        })
+
+    result = []
+    for hall_name, hall_items in grouped.items():
+        coords = next(
+            (v for k, v in DINING_HALLS.items() if k.lower() in hall_name.lower()),
+            {"lat": 40.4237, "lng": -86.9212}
+        )
+        # Collect all unique nutrition categories present at this hall
+        all_cats = sorted({c for item in hall_items for c in item["categories"]})
+        result.append({
+            "hall":       hall_name,
+            "lat":        coords["lat"],
+            "lng":        coords["lng"],
+            "categories": all_cats,
+            "items":      hall_items,
+        })
+
+    return {
+        "date":   date.today().isoformat(),
+        "total":  len(items),
+        "halls":  result,
+    }
+
 
 @app.get("/")
 async def root():

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import Layout from "@/components/layout";
 import { X, Zap, Check, X as CloseIcon, Loader2, Camera, Upload } from "lucide-react";
+// Upload import kept for the camera-error overlay button
 import { cn } from "@/lib/utils";
 import { useLocation } from "wouter";
 
@@ -291,22 +292,14 @@ export default function CameraPage() {
           {!hasPhoto ? (
             <div className="flex flex-col items-center gap-4">
               {cameraReady && (
-                <button 
-                  onClick={takePicture} 
+                <button
+                  onClick={takePicture}
                   data-testid="button-capture"
                   className="w-20 h-20 rounded-full border-[6px] border-orange-400 flex items-center justify-center p-1 bg-white shadow-lg active:scale-95 transition-transform"
                 >
                   <div className="w-full h-full rounded-full border-[3px] border-orange-400 bg-transparent" />
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white/90 text-gray-800 font-semibold rounded-full shadow-lg text-sm"
-              >
-                <Upload size={18} />
-                Upload photo
-              </button>
             </div>
           ) : (
             <div className="flex gap-6 items-center">
