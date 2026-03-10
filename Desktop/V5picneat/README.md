@@ -141,14 +141,14 @@ Copy `backend/.env.example` to `backend/.env` and add your real keys (never comm
 
 ```bash
 # Groq API
-GROQ_API_KEY=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
+GROQ_API_KEY=your_groq_api_key_here
 
-# Supabase - PicNEat Project (READY TO USE!)
-SUPABASE_URL=https://rqkfivmphtutghokudgh.supabase.co
-SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJxa2Zpdm1waHR1dGdob2t1ZGdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMDY0MjEsImV4cCI6MjA4ODU4MjQyMX0.0R6s2qyQwdQoqfrwcSFYYidXTovjVkyYgfCqZPTsslE
+# Supabase - PicNEat Project
+SUPABASE_URL=your_supabase_url_here
+SUPABASE_KEY=your_supabase_anon_key_here
 
 # USDA FDC API
-USDA_API_KEY=OmWtLJasYTUq8U0bmGLrAbf0taNcpdeYLKj5cs0O
+USDA_API_KEY=your_usda_api_key_here
 ```
 
 ### **iOS (PicNEatAPI.swift)**
