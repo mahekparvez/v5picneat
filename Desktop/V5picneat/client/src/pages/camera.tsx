@@ -40,47 +40,38 @@ export default function CameraPage() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
 
-  useEffect(() => {
+  const setupCamera = async () => {
+    setCameraError(null);
     let stream: MediaStream | null = null;
-    async function setupCamera() {
-      setCameraError(null);
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false,
+      });
+      if (videoRef.current) { videoRef.current.srcObject = stream; setCameraReady(true); }
+    } catch {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
-          audio: false,
-        });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          setCameraReady(true);
-        }
-      } catch (err) {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: false,
-          });
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            setCameraReady(true);
-          }
-        } catch (err2) {
-          const msg = err instanceof Error ? err.message : String(err);
-          setCameraError(
-            msg.includes('Permission') || msg.includes('NotAllowed')
-              ? 'Camera permission denied. Use "Upload photo" below.'
-              : 'Camera not available. Use "Upload photo" to analyze a picture.'
-          );
-          setCameraReady(false);
-        }
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        if (videoRef.current) { videoRef.current.srcObject = stream; setCameraReady(true); }
+      } catch (err2) {
+        const msg = err2 instanceof Error ? err2.message : String(err2);
+        const isPermission = msg.includes('Permission') || msg.includes('NotAllowed') || msg.includes('denied');
+        setCameraError(isPermission ? 'permission_denied' : 'unavailable');
+        setCameraReady(false);
       }
     }
+  };
+
+  useEffect(() => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError('Camera not supported in this browser. Use "Upload photo" instead.');
+      setCameraError('unsupported');
     } else {
-      setupCamera();
+      void setupCamera();
     }
     return () => {
-      if (stream) stream.getTracks().forEach((t) => t.stop());
+      if (videoRef.current?.srcObject) {
+        (videoRef.current.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
+      }
     };
   }, []);
 
@@ -206,18 +197,35 @@ export default function CameraPage() {
             <>
               <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
               {cameraError && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 p-6 text-center z-10">
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 p-6 text-center z-10">
                   <Camera className="w-12 h-12 text-amber-400 mb-3 opacity-80" />
-                  <p className="text-white font-medium mb-1">Camera unavailable</p>
-                  <p className="text-white/80 text-sm mb-6 max-w-xs">{cameraError}</p>
-                  <p className="text-white/60 text-xs mb-4">Upload a food photo to analyze it:</p>
+                  <p className="text-white font-bold text-lg mb-1">
+                    {cameraError === 'permission_denied' ? 'Camera access denied' : 'Camera unavailable'}
+                  </p>
+                  <p className="text-white/70 text-sm mb-6 max-w-xs">
+                    {cameraError === 'permission_denied'
+                      ? 'Allow camera access in your browser settings, then tap below to try again.'
+                      : cameraError === 'unsupported'
+                      ? 'Camera is not supported in this browser.'
+                      : 'Could not start the camera. Upload a photo to continue.'}
+                  </p>
+                  {cameraError === 'permission_denied' && (
+                    <button
+                      type="button"
+                      onClick={() => void setupCamera()}
+                      className="flex items-center gap-2 px-6 py-3 bg-white text-gray-900 font-bold rounded-full shadow-lg mb-3"
+                    >
+                      <Camera size={18} />
+                      Grant Camera Access
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     className="flex items-center gap-2 px-6 py-3 bg-orange-500 text-white font-bold rounded-full shadow-lg"
                   >
-                    <Upload size={20} />
-                    Upload photo
+                    <Upload size={18} />
+                    Upload photo instead
                   </button>
                 </div>
               )}

@@ -34,7 +34,7 @@ export default function WelcomePage() {
           transition={{ delay: 0.2, duration: 0.5 }}
           className="space-y-4"
         >
-          <Link href="/onboarding/gender">
+          <Link href="/onboarding/step1">
             <button
               data-testid="button-get-started"
               className="w-full bg-gray-900 text-white py-4 rounded-full font-bold text-lg uppercase tracking-tight hover:bg-gray-800 transition-all shadow-lg active:scale-98"
@@ -42,13 +42,13 @@ export default function WelcomePage() {
               Get Started
             </button>
           </Link>
-          
-          <Link href="/">
+
+          <Link href="/login">
             <button
               data-testid="button-login"
               className="w-full bg-white text-gray-900 py-4 rounded-full font-bold text-lg uppercase tracking-tight hover:bg-gray-50 transition-all border-2 border-gray-200 active:scale-98"
             >
-              I already have an account
+              Sign in with Purdue Email
             </button>
           </Link>
         </motion.div>
