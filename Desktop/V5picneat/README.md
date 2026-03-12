@@ -275,7 +275,7 @@ print("Detected: \(result.foods[0].name)")
 
 ---
 
-## 🎓 For StarkHacks
+## 🎉 For Fun
 
 **What to Demo:**
 1. ✅ Take photo of dining hall food

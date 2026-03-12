@@ -5,6 +5,7 @@ Complete production-ready implementation
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 import httpx
@@ -138,55 +139,76 @@ def compress_image(image_bytes: bytes, max_size: int = 800) -> str:
         raise HTTPException(status_code=400, detail=f"Invalid image: {str(e)}")
 
 async def call_groq_vision(base64_image: str) -> Dict:
-    """Call Groq Vision API with the food analysis prompt"""
+    """Call Groq Vision API with the food analysis prompt."""
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Groq error: GROQ_API_KEY is not set in the backend environment.")
+
+    payload = {
+        # Recommended Groq multimodal model
+        "model": "meta-llama/llama-4-scout-17b-16e-instruct",
+        "messages": [
+            {
+                "role": "system",
+                "content": GROQ_SYSTEM_PROMPT,
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Analyze this meal image and respond ONLY with the required JSON output format.",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_image}",
+                        },
+                    },
+                ],
+            },
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.1,
+        "max_tokens": 1500,
+    }
+
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             response = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}",
-                    "Content-Type": "application/json"
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
                 },
-                json={
-                    "model": "llama-3.2-90b-vision-preview",
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": GROQ_SYSTEM_PROMPT
-                        },
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:image/jpeg;base64,{base64_image}"
-                                    }
-                                },
-                                {
-                                    "type": "text",
-                                    "text": "Analyze this meal and return the food items with portions in the required JSON format."
-                                }
-                            ]
-                        }
-                    ],
-                    "response_format": {"type": "json_object"},
-                    "temperature": 0.1,
-                    "max_tokens": 1500
-                }
+                json=payload,
             )
-            
-            response.raise_for_status()
+
+            # If Groq returns a 4xx/5xx, bubble up the real error message
+            if response.status_code >= 400:
+                try:
+                    err_json = response.json()
+                    groq_msg = err_json.get("error", {}).get("message") or err_json
+                except Exception:
+                    groq_msg = response.text
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Groq API {response.status_code}: {groq_msg}",
+                )
+
             result = response.json()
-            
+
             # Extract and parse JSON from response
-            content = result['choices'][0]['message']['content']
+            content = result["choices"][0]["message"]["content"]
             return json.loads(content)
-            
+
         except httpx.TimeoutException:
             raise HTTPException(status_code=504, detail="Groq API timeout - please try again")
         except json.JSONDecodeError as e:
-            raise HTTPException(status_code=500, detail=f"Failed to parse Groq response: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to parse Groq response JSON: {str(e)}")
+        except HTTPException:
+            # Already a clean HTTP-style error
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Groq API error: {str(e)}")
 
@@ -663,6 +685,236 @@ async def health():
         "groq_key": "***" + os.getenv("GROQ_API_KEY", "")[-4:] if os.getenv("GROQ_API_KEY") else "NOT SET",
         "supabase_url": os.getenv("SUPABASE_URL", "NOT SET")
     }
+
+
+@app.get("/playground", response_class=HTMLResponse)
+async def playground():
+    """Minimal browser UI for testing /analyze-meal."""
+    return """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>PicNEat Playground</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <style>
+            body {
+                margin: 0;
+                font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+                background: #020617;
+                color: #e5e7eb;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .card {
+                max-width: 760px;
+                width: 100%;
+                margin: 16px;
+                padding: 20px 22px;
+                border-radius: 18px;
+                background: #020617;
+                box-shadow: 0 20px 50px rgba(15, 23, 42, 0.8);
+                border: 1px solid rgba(148, 163, 184, 0.4);
+            }
+            h1 {
+                margin: 0 0 4px;
+                font-size: 20px;
+            }
+            p {
+                margin: 0 0 12px;
+                color: #9ca3af;
+                font-size: 14px;
+            }
+            .row {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 16px;
+            }
+            .col {
+                flex: 1 1 260px;
+                min-width: 0;
+            }
+            .box {
+                padding: 12px;
+                border-radius: 12px;
+                border: 1px solid rgba(148, 163, 184, 0.35);
+                background: #020617;
+            }
+            input[type="file"] {
+                font-size: 13px;
+                color: #e5e7eb;
+            }
+            input[type="file"]::file-selector-button {
+                border-radius: 999px;
+                border: 1px solid rgba(148, 163, 184, 0.7);
+                padding: 6px 12px;
+                background: #020617;
+                color: #e5e7eb;
+                cursor: pointer;
+                margin-right: 10px;
+            }
+            button {
+                margin-top: 10px;
+                border-radius: 999px;
+                border: none;
+                padding: 8px 16px;
+                font-size: 13px;
+                font-weight: 500;
+                cursor: pointer;
+                background: linear-gradient(135deg, #38bdf8, #6366f1);
+                color: #0b1120;
+            }
+            button:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+            .status {
+                margin-top: 8px;
+                font-size: 13px;
+                color: #9ca3af;
+            }
+            .status strong {
+                color: #e5e7eb;
+            }
+            .preview {
+                width: 100%;
+                max-height: 220px;
+                object-fit: contain;
+                border-radius: 10px;
+                border: 1px solid rgba(148, 163, 184, 0.4);
+                margin-top: 8px;
+                background: #020617;
+            }
+            .json {
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+                font-size: 12px;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                max-height: 260px;
+                overflow: auto;
+            }
+            .metrics {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                margin: 6px 0 4px;
+                font-size: 13px;
+            }
+            .pill {
+                border-radius: 999px;
+                border: 1px solid rgba(148, 163, 184, 0.6);
+                padding: 4px 8px;
+            }
+            small {
+                font-size: 11px;
+                color: #9ca3af;
+            }
+        </style>
+    </head>
+    <body>
+        <main class="card">
+            <h1>PicNEat Meal Analyzer</h1>
+            <p>Upload a dining hall photo and hit Analyze to see the full JSON your iOS app will receive.</p>
+            <div class="row">
+                <section class="col">
+                    <div class="box">
+                        <label for="fileInput"><strong>1.</strong> Choose food image</label><br />
+                        <input id="fileInput" type="file" accept="image/*" />
+                        <button id="analyzeBtn">Analyze Meal</button>
+                        <div id="status" class="status">Idle · waiting for image.</div>
+                        <img id="preview" class="preview" style="display:none;" alt="Preview" />
+                    </div>
+                </section>
+                <section class="col">
+                    <div class="box">
+                        <div class="metrics">
+                            <span class="pill">Calories: <strong id="calories">0</strong> kcal</span>
+                            <span class="pill">Protein: <strong id="protein">0</strong> g</span>
+                            <span class="pill">Carbs: <strong id="carbs">0</strong> g</span>
+                            <span class="pill">Fats: <strong id="fats">0</strong> g</span>
+                        </div>
+                        <small>Endpoint: <code>POST /analyze-meal</code></small>
+                        <div id="json" class="json" style="margin-top:8px;">{ /* Run an analysis to see the JSON response here. */ }</div>
+                    </div>
+                </section>
+            </div>
+        </main>
+        <script>
+            (function () {
+                const fileInput = document.getElementById("fileInput");
+                const analyzeBtn = document.getElementById("analyzeBtn");
+                const statusEl = document.getElementById("status");
+                const preview = document.getElementById("preview");
+                const caloriesEl = document.getElementById("calories");
+                const proteinEl = document.getElementById("protein");
+                const carbsEl = document.getElementById("carbs");
+                const fatsEl = document.getElementById("fats");
+                const jsonEl = document.getElementById("json");
+
+                fileInput.addEventListener("change", (e) => {
+                    const file = e.target.files[0];
+                    if (!file) {
+                        preview.style.display = "none";
+                        statusEl.textContent = "Idle · waiting for image.";
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        preview.src = ev.target.result;
+                        preview.style.display = "block";
+                    };
+                    reader.readAsDataURL(file);
+                    statusEl.textContent = "Image selected · ready to analyze.";
+                });
+
+                analyzeBtn.addEventListener("click", () => {
+                    const file = fileInput.files[0];
+                    if (!file) {
+                        statusEl.textContent = "Error · choose an image first.";
+                        return;
+                    }
+                    const formData = new FormData();
+                    formData.append("file", file);
+
+                    analyzeBtn.disabled = true;
+                    statusEl.textContent = "Analyzing image…";
+                    const started = performance.now();
+
+                    fetch("/analyze-meal", { method: "POST", body: formData })
+                        .then(async (res) => {
+                            if (!res.ok) {
+                                let msg = "HTTP " + res.status;
+                                try {
+                                    const err = await res.json();
+                                    msg = err.detail || msg;
+                                } catch (_) {}
+                                throw new Error(msg);
+                            }
+                            return res.json();
+                        })
+                        .then((data) => {
+                            const elapsed = Math.round(performance.now() - started);
+                            caloriesEl.textContent = data.total_calories ?? 0;
+                            proteinEl.textContent = (data.total_protein ?? 0).toFixed(1);
+                            carbsEl.textContent = (data.total_carbs ?? 0).toFixed(1);
+                            fatsEl.textContent = (data.total_fats ?? 0).toFixed(1);
+                            jsonEl.textContent = JSON.stringify(data, null, 2);
+                            statusEl.textContent = "Done · " + (data.foods ? data.foods.length : 0) + " foods detected (" + elapsed + " ms).";
+                        })
+                        .catch((err) => {
+                            statusEl.textContent = "Error · " + err.message;
+                        })
+                        .finally(() => {
+                            analyzeBtn.disabled = false;
+                        });
+                });
+            })();
+        </script>
+    </body>
+    </html>
+    """
 
 if __name__ == "__main__":
     import uvicorn
